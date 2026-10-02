@@ -37,12 +37,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt || pip install aiohttp requests
 
+    - name: Start Postgres for test
+      run: docker compose up postgres -d
+
     - name: Start Application in Background
       run: |
         ./gradlew bootRun &
         echo $! > app_pid.txt
-        sleep 20 # Wait for app to start
-        curl -s http://localhost:8080/health/ready || (echo "App not ready!" && exit 1)
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health/ready > /dev/null; then
+            echo "App is ready!"
+            exit 0
+          fi
+          echo "Waiting for app to start... $i/30"
+          sleep 2
+        done
+        echo "App failed to start!"
+        exit 1
 
     - name: Run Burst Test (Integration)
       run: |
