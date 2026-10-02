@@ -30,21 +30,32 @@ public class ShowController {
     @ResponseStatus(HttpStatus.CREATED)
     public com.paytm.seatreservation.dto.ReservationResponse reserveSeats(
         @PathVariable UUID id,
-        @RequestHeader(value = "Authorization") String authHeader,
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestBody com.paytm.seatreservation.dto.ReserveSeatsRequest request
     ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Missing or invalid Authorization header");
+        }
         String userId = authHeader.replace("Bearer ", "").trim();
+        if (userId.isEmpty()) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Empty token provided");
+        }
         return reservationService.reserveSeats(id, userId, idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString(), request);
     }
-
 
     @PostMapping("/reservations/{reservationId}/cancel")
     public void cancelReservation(
         @PathVariable UUID reservationId,
-        @RequestHeader(value = "Authorization") String authHeader
+        @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Missing or invalid Authorization header");
+        }
         String userId = authHeader.replace("Bearer ", "").trim();
+        if (userId.isEmpty()) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Empty token provided");
+        }
         reservationService.cancelReservation(reservationId, userId);
     }
     @GetMapping("/{id}")
