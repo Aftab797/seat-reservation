@@ -13,15 +13,29 @@ import java.util.UUID;
 public class ShowController {
 
     private final ShowService showService;
+    private final com.paytm.seatreservation.service.ReservationService reservationService;
 
-    public ShowController(ShowService showService) {
+    public ShowController(ShowService showService, com.paytm.seatreservation.service.ReservationService reservationService) {
         this.showService = showService;
+        this.reservationService = reservationService;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ShowResponse createShow(@RequestBody CreateShowRequest request) {
         return showService.createShow(request);
+    }
+
+    @PostMapping("/{id}/reserve")
+    @ResponseStatus(HttpStatus.CREATED)
+    public com.paytm.seatreservation.dto.ReservationResponse reserveSeats(
+        @PathVariable UUID id,
+        @RequestHeader(value = "Authorization") String authHeader,
+        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+        @RequestBody com.paytm.seatreservation.dto.ReserveSeatsRequest request
+    ) {
+        String userId = authHeader.replace("Bearer ", "").trim();
+        return reservationService.reserveSeats(id, userId, idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString(), request);
     }
 
     @GetMapping("/{id}")
