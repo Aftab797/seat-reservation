@@ -20,6 +20,7 @@ public class ShowService {
 
     private final ShowRepository showRepository;
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+    private final java.util.concurrent.ConcurrentMap<UUID, java.util.concurrent.atomic.AtomicInteger> availableSeatsGauges = new java.util.concurrent.ConcurrentHashMap<>();
     private final SeatRepository seatRepository;
     private final JdbcTemplate jdbcTemplate;
 
@@ -79,7 +80,8 @@ public class ShowService {
             else if ("CONFIRMED".equals(seat.status())) confirmed++;
         }
 
-        meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", showId.toString()), available);
+        availableSeatsGauges.computeIfAbsent(showId, id -> meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", id.toString()), new java.util.concurrent.atomic.AtomicInteger(available)))
+            .set(available);
 
         return new ShowResponse(
             show.id(),
