@@ -41,13 +41,9 @@
           }
         },
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows",
-          "protocol": "https",
+          "raw": "{{base_url}}/shows",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "shows"
@@ -61,13 +57,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows/{{show_id}}",
-          "protocol": "https",
+          "raw": "{{base_url}}/shows/{{show_id}}",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "shows",
@@ -119,13 +111,9 @@
           }
         },
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows/{{show_id}}/reserve",
-          "protocol": "https",
+          "raw": "{{base_url}}/shows/{{show_id}}/reserve",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "shows",
@@ -146,13 +134,9 @@
           }
         ],
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/reservations/{{reservation_id}}/cancel",
-          "protocol": "https",
+          "raw": "{{base_url}}/reservations/{{reservation_id}}/cancel",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "reservations",
@@ -168,13 +152,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/health/live",
-          "protocol": "https",
+          "raw": "{{base_url}}/health/live",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "health",
@@ -189,13 +169,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/health/ready",
-          "protocol": "https",
+          "raw": "{{base_url}}/health/ready",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "health",
@@ -210,13 +186,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "https://seat-reservation-production-ee5f.up.railway.app/actuator/prometheus",
-          "protocol": "https",
+          "raw": "{{base_url}}/actuator/prometheus",
           "host": [
-            "seat-reservation-production-ee5f",
-            "up",
-            "railway",
-            "app"
+            "{{base_url}}"
           ],
           "path": [
             "actuator",
@@ -224,6 +196,13 @@
           ]
         }
       }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://seat-reservation-production-ee5f.up.railway.app",
+      "type": "string"
     }
   ]
 }
