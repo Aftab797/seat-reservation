@@ -80,7 +80,7 @@ public class ShowService {
             else if ("CONFIRMED".equals(seat.status())) confirmed++;
         }
 
-        availableSeatsGauges.computeIfAbsent(showId, id -> meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", id.toString()), new java.util.concurrent.atomic.AtomicInteger(available)))
+        availableSeatsGauges.computeIfAbsent(showId, id -> meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", id.toString()), new java.util.concurrent.atomic.AtomicInteger(0)))
             .set(available);
 
         return new ShowResponse(
