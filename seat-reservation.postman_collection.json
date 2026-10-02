@@ -1,0 +1,166 @@
+{
+  "info": {
+    "_postman_id": "633c2b04-7e18-4553-af99-9cf7b955add2",
+    "name": "Seat reservation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "32323503"
+  },
+  "item": [
+    {
+      "name": "Create show",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.id) {",
+              "    pm.collectionVariables.set(\"show_id\", jsonData.id);",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"Avengers endgame\",\n    \"seats\": [\"A1\", \"A2\", \"A3\", \"A4\"],\n    \"price_paise\": 10000,\n    \"per_user_limit\": 2\n  }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "shows"
+          ]
+        }
+      }
+    },
+    {
+      "name": "get show",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows/{{show_id}}",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "shows",
+            "{{show_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Reserve show",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.reservation_id) {",
+              "    pm.collectionVariables.set(\"reservation_id\", jsonData.reservation_id);",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer user-1231"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "my-unique-request-2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"seats\": [\"A1\", \"A2\"]\n  }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/shows/{{show_id}}/reserve",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "shows",
+            "{{show_id}}",
+            "reserve"
+          ]
+        }
+      }
+    },
+    {
+      "name": "cancel resevation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer user-1231"
+          }
+        ],
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/reservations/{{reservation_id}}/cancel",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "reservations",
+            "{{reservation_id}}",
+            "cancel"
+          ]
+        }
+      }
+    }
+  ]
+}
