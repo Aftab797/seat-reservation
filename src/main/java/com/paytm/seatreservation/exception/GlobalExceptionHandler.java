@@ -1,5 +1,7 @@
 package com.paytm.seatreservation.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -8,14 +10,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(InvalidRequestException.class)
     public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException e) {
+        logger.warn("Invalid request: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("INVALID_REQUEST", e.getMessage()));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException e) {
+        logger.warn("Resource not found: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(
                         e.getMessage().toLowerCase().contains("seat") ? "SEAT_NOT_FOUND" : "RESERVATION_NOT_FOUND",
@@ -25,30 +31,35 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SeatTakenException.class)
     public ResponseEntity<ErrorResponse> handleSeatTaken(SeatTakenException e) {
+        logger.warn("Seat taken conflict: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("SEAT_TAKEN", e.getMessage()));
     }
 
     @ExceptionHandler(PerUserLimitException.class)
     public ResponseEntity<ErrorResponse> handlePerUserLimit(PerUserLimitException e) {
+        logger.warn("Per user limit conflict: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("PER_USER_LIMIT", e.getMessage()));
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)
     public ResponseEntity<ErrorResponse> handleIdempotencyConflict(IdempotencyConflictException e) {
+        logger.warn("Idempotency conflict: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("IDEMPOTENCY_KEY_REUSED", e.getMessage()));
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException e) {
+        logger.warn("Unauthorized access: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ErrorResponse("RESERVATION_NOT_OWNED", e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception e) {
+        logger.error("Unhandled exception occurred", e);
         if (e instanceof org.springframework.dao.DataAccessException || e instanceof java.sql.SQLException) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(new ErrorResponse("DEPENDENCY_UNAVAILABLE", "Database unavailable"));
