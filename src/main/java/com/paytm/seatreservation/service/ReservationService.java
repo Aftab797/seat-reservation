@@ -19,85 +19,96 @@ import java.util.stream.Collectors;
 
 @Service
 public class ReservationService {
+    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
     private final JdbcTemplate jdbcTemplate;
     private final ShowRepository showRepository;
 
-    public ReservationService(JdbcTemplate jdbcTemplate, ShowRepository showRepository) {
+    public ReservationService(JdbcTemplate jdbcTemplate, ShowRepository showRepository, io.micrometer.core.instrument.MeterRegistry meterRegistry) {
         this.jdbcTemplate = jdbcTemplate;
         this.showRepository = showRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
     public ReservationResponse reserveSeats(UUID showId, String userId, String idempotencyKey, ReserveSeatsRequest request) {
-        if (request.seats() == null || request.seats().isEmpty()) {
-            throw new InvalidRequestException("No seats requested");
+        long startTime = System.currentTimeMillis();
+        try {
+            if (request.seats() == null || request.seats().isEmpty()) {
+                throw new InvalidRequestException("No seats requested");
+            }
+
+            List<String> sortedSeats = request.seats().stream()
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+            if (sortedSeats.size() != request.seats().size()) {
+                throw new InvalidRequestException("Duplicate seats in request");
+            }
+
+            String requestHash = generateRequestHash(showId, sortedSeats);
+            UUID reservationIdFromIdempotency = handleIdempotency(showId, userId, idempotencyKey, requestHash);
+
+            if (reservationIdFromIdempotency != null) {
+                 return fetchExistingReservation(reservationIdFromIdempotency, showId, userId);
+            }
+
+            Show show = showRepository.findById(showId)
+                .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
+
+            // 1. Advisory Lock (user_id, show_id) to serialize this user's requests for this show
+            long lockKey = generateLockKey(userId, showId);
+            jdbcTemplate.execute("SELECT pg_advisory_xact_lock(" + lockKey + ")");
+
+            // 2. Check and Increment Quota atomically
+            int updatedQuota = incrementUserQuota(showId, userId, sortedSeats.size(), show.perUserLimit());
+            if (updatedQuota == 0) {
+                meterRegistry.counter("reservations_declined_total", "reason", "per-user-limit").increment();
+                throw new PerUserLimitException("Per-user limit exceeded");
+            }
+
+            // 3. Lock Requested Seats explicitly to avoid deadlocks (ORDER BY seat_number)
+            List<String> lockedSeats = lockAvailableSeats(showId, sortedSeats);
+
+            if (lockedSeats.size() != sortedSeats.size()) {
+                meterRegistry.counter("reservations_declined_total", "reason", "seat-taken").increment();
+                throw new SeatTakenException("One or more requested seats are no longer available");
+            }
+
+            // 4. Create Reservation Record
+            UUID reservationId = UUID.randomUUID();
+            long amountPaise = show.pricePaise() * sortedSeats.size();
+            jdbcTemplate.update(
+                "INSERT INTO reservations (id, show_id, user_id, amount_paise, status) VALUES (?, ?, ?, ?, 'CONFIRMED')",
+                reservationId, showId, userId, amountPaise
+            );
+
+            // 6. Update Idempotency Record
+            jdbcTemplate.update(
+                "UPDATE idempotency_keys SET reservation_id = ? WHERE show_id = ? AND user_id = ? AND idempotency_key = ?",
+                reservationId, showId, userId, idempotencyKey
+            );
+
+            // 5. Update Seats conditionally
+            int updatedSeats = jdbcTemplate.update(
+                "UPDATE seats SET status = 'CONFIRMED', reservation_id = ?, user_id = ?, updated_at = now() " +
+                "WHERE show_id = ? AND seat_number = ANY(?) AND status = 'AVAILABLE'",
+                reservationId, userId, showId, sortedSeats.toArray(new String[0])
+            );
+
+            if (updatedSeats != sortedSeats.size()) {
+                meterRegistry.counter("reservations_declined_total", "reason", "seat-taken").increment();
+                throw new SeatTakenException("Concurrency conflict: seat was taken");
+            }
+
+            meterRegistry.counter("reservations_confirmed_total").increment();
+            return new ReservationResponse(
+                reservationId, showId, userId, sortedSeats, amountPaise, "CONFIRMED"
+            );
+        } finally {
+            meterRegistry.timer("reservation_duration_seconds").record(java.time.Duration.ofMillis(System.currentTimeMillis() - startTime));
         }
-
-        List<String> sortedSeats = request.seats().stream()
-            .distinct()
-            .sorted()
-            .collect(Collectors.toList());
-
-        if (sortedSeats.size() != request.seats().size()) {
-            throw new InvalidRequestException("Duplicate seats in request");
-        }
-
-        String requestHash = generateRequestHash(showId, sortedSeats);
-        UUID reservationIdFromIdempotency = handleIdempotency(showId, userId, idempotencyKey, requestHash);
-
-        if (reservationIdFromIdempotency != null) {
-             return fetchExistingReservation(reservationIdFromIdempotency, showId, userId);
-        }
-
-        Show show = showRepository.findById(showId)
-            .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
-
-        // 1. Advisory Lock (user_id, show_id) to serialize this user's requests for this show
-        long lockKey = generateLockKey(userId, showId);
-        jdbcTemplate.execute("SELECT pg_advisory_xact_lock(" + lockKey + ")");
-
-        // 2. Check and Increment Quota atomically
-        int updatedQuota = incrementUserQuota(showId, userId, sortedSeats.size(), show.perUserLimit());
-        if (updatedQuota == 0) {
-            throw new PerUserLimitException("Per-user limit exceeded");
-        }
-
-        // 3. Lock Requested Seats explicitly to avoid deadlocks (ORDER BY seat_number)
-        List<String> lockedSeats = lockAvailableSeats(showId, sortedSeats);
-
-        if (lockedSeats.size() != sortedSeats.size()) {
-            throw new SeatTakenException("One or more requested seats are no longer available");
-        }
-
-        // 4. Create Reservation Record
-        UUID reservationId = UUID.randomUUID();
-        long amountPaise = show.pricePaise() * sortedSeats.size();
-        jdbcTemplate.update(
-            "INSERT INTO reservations (id, show_id, user_id, amount_paise, status) VALUES (?, ?, ?, ?, 'CONFIRMED')",
-            reservationId, showId, userId, amountPaise
-        );
-
-        // 6. Update Idempotency Record
-        jdbcTemplate.update(
-            "UPDATE idempotency_keys SET reservation_id = ? WHERE show_id = ? AND user_id = ? AND idempotency_key = ?",
-            reservationId, showId, userId, idempotencyKey
-        );
-
-        // 5. Update Seats conditionally
-        int updatedSeats = jdbcTemplate.update(
-            "UPDATE seats SET status = 'CONFIRMED', reservation_id = ?, user_id = ?, updated_at = now() " +
-            "WHERE show_id = ? AND seat_number = ANY(?) AND status = 'AVAILABLE'",
-            reservationId, userId, showId, sortedSeats.toArray(new String[0])
-        );
-
-        if (updatedSeats != sortedSeats.size()) {
-            throw new SeatTakenException("Concurrency conflict: seat was taken");
-        }
-
-        return new ReservationResponse(
-            reservationId, showId, userId, sortedSeats, amountPaise, "CONFIRMED"
-        );
     }
 
     private int incrementUserQuota(UUID showId, String userId, int requestedSeats, int limit) {
@@ -174,13 +185,16 @@ public class ReservationService {
         UUID existingReservationId = (UUID) existing.get(0).get("reservation_id");
 
         if (!requestHash.equals(existingHash)) {
+            meterRegistry.counter("reservations_declined_total", "reason", "idempotency_conflict").increment();
             throw new com.paytm.seatreservation.exception.IdempotencyConflictException("Idempotency key reused with different request body");
         }
 
         if (existingReservationId == null) {
+            meterRegistry.counter("reservations_declined_total", "reason", "idempotency_conflict").increment();
              throw new com.paytm.seatreservation.exception.IdempotencyConflictException("Concurrent identical request in flight");
         }
 
+        meterRegistry.counter("reservations_declined_total", "reason", "idempotent-replay").increment();
         return existingReservationId;
     }
 
@@ -255,5 +269,6 @@ public class ReservationService {
             "UPDATE user_show_quotas SET seats_held = seats_held - ? WHERE show_id = ? AND user_id = ?",
             seats.size(), showId, userId
         );
+        meterRegistry.counter("reservations_cancelled_total").increment();
     }
 }

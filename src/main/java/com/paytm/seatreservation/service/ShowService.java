@@ -19,13 +19,15 @@ import java.util.UUID;
 public class ShowService {
 
     private final ShowRepository showRepository;
+    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
     private final SeatRepository seatRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    public ShowService(ShowRepository showRepository, SeatRepository seatRepository, JdbcTemplate jdbcTemplate) {
+    public ShowService(ShowRepository showRepository, SeatRepository seatRepository, JdbcTemplate jdbcTemplate, io.micrometer.core.instrument.MeterRegistry meterRegistry) {
         this.showRepository = showRepository;
         this.seatRepository = seatRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -33,7 +35,7 @@ public class ShowService {
         if (request.seats() == null || request.seats().isEmpty()) {
             throw new InvalidRequestException("Show must have at least one seat");
         }
-        
+
         long distinctSeats = request.seats().stream().distinct().count();
         if (distinctSeats != request.seats().size()) {
             throw new InvalidRequestException("Duplicate seats provided");
@@ -41,7 +43,7 @@ public class ShowService {
 
         UUID showId = UUID.randomUUID();
         Integer perUserLimit = request.per_user_limit() != null ? request.per_user_limit() : 4;
-        
+
         Show show = new Show(
             showId,
             request.name(),
@@ -76,6 +78,8 @@ public class ShowService {
             if ("AVAILABLE".equals(seat.status())) available++;
             else if ("CONFIRMED".equals(seat.status())) confirmed++;
         }
+
+        meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", showId.toString()), available);
 
         return new ShowResponse(
             show.id(),
