@@ -90,7 +90,9 @@ public class ShowService {
             confirmed,
             seats
         );
-        public void updateAvailableSeatsGauge(UUID showId) {
+    }
+
+    public void updateAvailableSeatsGauge(UUID showId) {
         Integer available = jdbcTemplate.queryForObject(
             "SELECT count(*) FROM seats WHERE show_id = ? AND status = 'AVAILABLE'",
             Integer.class, showId
@@ -100,6 +102,5 @@ public class ShowService {
                 .set(available);
         }
     }
-}
 }
 
