@@ -47,15 +47,15 @@ public class ReservationService {
                 throw new InvalidRequestException("Duplicate seats in request");
             }
 
+            Show show = showRepository.findById(showId)
+                .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
+
             String requestHash = generateRequestHash(showId, sortedSeats);
             UUID reservationIdFromIdempotency = handleIdempotency(showId, userId, idempotencyKey, requestHash);
 
             if (reservationIdFromIdempotency != null) {
                  return fetchExistingReservation(reservationIdFromIdempotency, showId, userId);
             }
-
-            Show show = showRepository.findById(showId)
-                .orElseThrow(() -> new ResourceNotFoundException("Show not found"));
 
             // 1. Advisory Lock (user_id, show_id) to serialize this user's requests for this show
             long lockKey = generateLockKey(userId, showId);
