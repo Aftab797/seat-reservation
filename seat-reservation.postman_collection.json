@@ -161,6 +161,69 @@
           ]
         }
       }
+    },
+    {
+      "name": "Live check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/health/live",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "health",
+            "live"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Ready check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/health/ready",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "health",
+            "ready"
+          ]
+        }
+      }
+    },
+    {
+      "name": "prometheus",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://seat-reservation-production-ee5f.up.railway.app/actuator/prometheus",
+          "protocol": "https",
+          "host": [
+            "seat-reservation-production-ee5f",
+            "up",
+            "railway",
+            "app"
+          ],
+          "path": [
+            "actuator",
+            "prometheus"
+          ]
+        }
+      }
     }
   ]
 }
