@@ -43,6 +43,7 @@ To prevent deadlocks when locking multiple seats, the application always sorts t
 
 
 **Holds:** This implementation does not use a temporary hold state because there is no separate payment or checkout phase in the exercise. A successful reservation atomically transitions a seat directly from AVAILABLE to CONFIRMED. Cancellation transitions it back to AVAILABLE. Therefore, HELD is always 0 in this implementation.
+
 ## 5. Cancellation
 
 Cancellation is strictly restricted to the owner of the reservation. The operation runs in a single transaction that:
