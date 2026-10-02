@@ -199,5 +199,61 @@ public class ReservationService {
             reservationId, showId, userId, seats, (Long) resData.get(0).get("amount_paise"), (String) resData.get(0).get("status")
         );
     }
-}
 
+    @Transactional
+    public void cancelReservation(UUID reservationId, String userId) {
+        // Find the reservation
+        List<java.util.Map<String, Object>> resData = jdbcTemplate.queryForList(
+            "SELECT show_id, user_id, status FROM reservations WHERE id = ?",
+            reservationId
+        );
+
+        if (resData.isEmpty()) {
+            throw new ResourceNotFoundException("Reservation not found");
+        }
+
+        UUID showId = (UUID) resData.get(0).get("show_id");
+        String ownerId = (String) resData.get(0).get("user_id");
+        String status = (String) resData.get(0).get("status");
+
+        if (!userId.equals(ownerId)) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Cannot cancel reservation belonging to another user");
+        }
+
+        if ("CANCELLED".equals(status)) {
+            return; // Idempotent cancellation
+        }
+
+        // 1. Advisory Lock (user_id, show_id) to serialize this user's requests for this show
+        long lockKey = generateLockKey(userId, showId);
+        jdbcTemplate.execute("SELECT pg_advisory_xact_lock(" + lockKey + ")");
+
+        // Find the seats currently confirmed for this reservation
+        List<String> seats = jdbcTemplate.queryForList(
+            "SELECT seat_number FROM seats WHERE reservation_id = ? ORDER BY seat_number FOR UPDATE",
+            String.class, reservationId
+        );
+
+        if (seats.isEmpty()) {
+            return; // Unlikely, but handle safely
+        }
+
+        // 2. Set reservation.status = CANCELLED
+        jdbcTemplate.update(
+            "UPDATE reservations SET status = 'CANCELLED', cancelled_at = now() WHERE id = ?",
+            reservationId
+        );
+
+        // 3. Set those seats = AVAILABLE
+        jdbcTemplate.update(
+            "UPDATE seats SET status = 'AVAILABLE', reservation_id = NULL, user_id = NULL, updated_at = now() WHERE reservation_id = ?",
+            reservationId
+        );
+
+        // 4. Decrement user_show_quotas by the number of released seats
+        jdbcTemplate.update(
+            "UPDATE user_show_quotas SET seats_held = seats_held - ? WHERE show_id = ? AND user_id = ?",
+            seats.size(), showId, userId
+        );
+    }
+}
