@@ -25,3 +25,33 @@ jobs:
 
     - name: Run Tests (Unit, Integration, Concurrency with Testcontainers)
       run: ./gradlew test
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt || pip install aiohttp requests
+
+    - name: Start Application in Background
+      run: |
+        ./gradlew bootRun &
+        echo $! > app_pid.txt
+        sleep 20 # Wait for app to start
+        curl -s http://localhost:8080/health/ready || (echo "App not ready!" && exit 1)
+
+    - name: Run Burst Test (Integration)
+      run: |
+        chmod +x scripts/burst.sh
+        ./scripts/burst.sh http://localhost:8080 5000 50
+
+    - name: Stop Application
+      if: always()
+      run: |
+        if [ -f app_pid.txt ]; then
+          kill $(cat app_pid.txt) || true
+        fi

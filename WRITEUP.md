@@ -4,12 +4,12 @@ This document outlines the design decisions made to ensure correctness, consiste
 
 ## 1. Atomic Decision (No Double-Selling)
 
-PostgreSQL is the single source of truth and the serialization boundary for the system. 
+PostgreSQL is the single source of truth and the serialization boundary for the system.
 To guarantee that a seat can never be double-sold, we rely on atomic row-level locks via `FOR UPDATE SKIP LOCKED`.
 
 ```sql
-SELECT seat_number, status FROM seats 
-WHERE show_id = ? AND seat_number = ANY(?) 
+SELECT seat_number, status FROM seats
+WHERE show_id = ? AND seat_number = ANY(?)
 ORDER BY seat_number FOR UPDATE SKIP LOCKED
 ```
 
@@ -41,6 +41,8 @@ The reservation system follows an **all-or-nothing** behavior for multi-seat req
 
 To prevent deadlocks when locking multiple seats, the application always sorts the requested seat numbers alphabetically before executing the `FOR UPDATE` query.
 
+
+**Holds:** This implementation does not use a temporary hold state because there is no separate payment or checkout phase in the exercise. A successful reservation atomically transitions a seat directly from AVAILABLE to CONFIRMED. Cancellation transitions it back to AVAILABLE. Therefore, HELD is always 0 in this implementation.
 ## 5. Cancellation
 
 Cancellation is strictly restricted to the owner of the reservation. The operation runs in a single transaction that:

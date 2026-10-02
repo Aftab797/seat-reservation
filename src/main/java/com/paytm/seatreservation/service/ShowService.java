@@ -18,11 +18,12 @@ import java.util.UUID;
 @Service
 public class ShowService {
 
+
     private final ShowRepository showRepository;
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
-    private final java.util.concurrent.ConcurrentMap<UUID, java.util.concurrent.atomic.AtomicInteger> availableSeatsGauges = new java.util.concurrent.ConcurrentHashMap<>();
     private final SeatRepository seatRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final java.util.concurrent.ConcurrentMap<UUID, java.util.concurrent.atomic.AtomicInteger> availableSeatsGauges = new java.util.concurrent.ConcurrentHashMap<>();
 
     public ShowService(ShowRepository showRepository, SeatRepository seatRepository, JdbcTemplate jdbcTemplate, io.micrometer.core.instrument.MeterRegistry meterRegistry) {
         this.showRepository = showRepository;
@@ -80,9 +81,6 @@ public class ShowService {
             else if ("CONFIRMED".equals(seat.status())) confirmed++;
         }
 
-        availableSeatsGauges.computeIfAbsent(showId, id -> meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", id.toString()), new java.util.concurrent.atomic.AtomicInteger(0)))
-            .set(available);
-
         return new ShowResponse(
             show.id(),
             show.name(),
@@ -92,6 +90,16 @@ public class ShowService {
             confirmed,
             seats
         );
+        public void updateAvailableSeatsGauge(UUID showId) {
+        Integer available = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM seats WHERE show_id = ? AND status = 'AVAILABLE'",
+            Integer.class, showId
+        );
+        if (available != null) {
+            availableSeatsGauges.computeIfAbsent(showId, id -> meterRegistry.gauge("seats_available", io.micrometer.core.instrument.Tags.of("show_id", id.toString()), new java.util.concurrent.atomic.AtomicInteger(0)))
+                .set(available);
+        }
     }
+}
 }
 

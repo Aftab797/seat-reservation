@@ -17,17 +17,21 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
+
 @Service
 public class ReservationService {
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
     private final JdbcTemplate jdbcTemplate;
     private final ShowRepository showRepository;
+    private final ShowService showService;
 
-    public ReservationService(JdbcTemplate jdbcTemplate, ShowRepository showRepository, io.micrometer.core.instrument.MeterRegistry meterRegistry) {
+    public ReservationService(JdbcTemplate jdbcTemplate, ShowRepository showRepository, io.micrometer.core.instrument.MeterRegistry meterRegistry, @Lazy ShowService showService) {
         this.jdbcTemplate = jdbcTemplate;
         this.showRepository = showRepository;
         this.meterRegistry = meterRegistry;
+        this.showService = showService;
     }
 
     @Transactional
@@ -62,6 +66,10 @@ public class ReservationService {
             jdbcTemplate.execute("SELECT pg_advisory_xact_lock(" + lockKey + ")");
 
             // 2. Check and Increment Quota atomically
+            if (sortedSeats.size() > show.perUserLimit()) {
+                throw new PerUserLimitException("Per-user limit exceeded");
+            }
+
             int updatedQuota = incrementUserQuota(showId, userId, sortedSeats.size(), show.perUserLimit());
             if (updatedQuota == 0) {
                 meterRegistry.counter("reservations_declined_total", "reason", "per-user-limit").increment();
@@ -103,6 +111,7 @@ public class ReservationService {
             }
 
             meterRegistry.counter("reservations_confirmed_total").increment();
+            showService.updateAvailableSeatsGauge(showId);
             return new ReservationResponse(
                 reservationId, showId, userId, sortedSeats, amountPaise, "CONFIRMED"
             );
@@ -136,7 +145,14 @@ public class ReservationService {
     }
 
     private long generateLockKey(String userId, UUID showId) {
-        return (userId + showId.toString()).hashCode();
+        String data = userId + showId.toString();
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(data.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.nio.ByteBuffer.wrap(hashBytes).getLong();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return data.hashCode(); // Fallback
+        }
     }
 
     private String generateRequestHash(UUID showId, List<String> sortedSeats) {
@@ -231,7 +247,7 @@ public class ReservationService {
         String status = (String) resData.get(0).get("status");
 
         if (!userId.equals(ownerId)) {
-            throw new com.paytm.seatreservation.exception.UnauthorizedException("Cannot cancel reservation belonging to another user");
+            throw new com.paytm.seatreservation.exception.ForbiddenException("Cannot cancel reservation belonging to another user");
         }
 
         if ("CANCELLED".equals(status)) {
@@ -270,5 +286,6 @@ public class ReservationService {
             seats.size(), showId, userId
         );
         meterRegistry.counter("reservations_cancelled_total").increment();
+        showService.updateAvailableSeatsGauge(showId);
     }
 }

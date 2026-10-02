@@ -3,7 +3,13 @@
 A production-style JSON HTTP API for assigned-seat reservations that remains correct under heavy concurrency and is observable in real time.
 
 ## Live URL
-*(Note: As this is a test implementation, it is meant to run locally via Docker Compose. Replace this with your actual public URL when deployed.)*
+https://seat-reservation-production-ee5f.up.railway.app
+
+Live testing script:
+```bash
+./scripts/burst.sh https://seat-reservation-production-ee5f.up.railway.app 20000 200
+```
+
 
 ## Burst Test (Load testing)
 

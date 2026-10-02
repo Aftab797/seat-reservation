@@ -75,6 +75,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("INVALID_REQUEST", "Invalid format for parameter: " + e.getName()));
     }
 
+    @ExceptionHandler(com.paytm.seatreservation.exception.ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(com.paytm.seatreservation.exception.ForbiddenException e) {
+        logger.warn("Forbidden access: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("FORBIDDEN", e.getMessage()));
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException e) {
         logger.warn("Unauthorized access: {}", e.getMessage());

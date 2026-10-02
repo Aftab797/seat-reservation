@@ -21,7 +21,13 @@ public class ShowController {
 
     @PostMapping("/shows")
     @ResponseStatus(HttpStatus.CREATED)
-    public ShowResponse createShow(@RequestBody CreateShowRequest request) {
+    public ShowResponse createShow(
+        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        @RequestBody CreateShowRequest request
+    ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ") || !"admin".equals(authHeader.replace("Bearer ", "").trim())) {
+            throw new com.paytm.seatreservation.exception.UnauthorizedException("Admin authorization required");
+        }
         return showService.createShow(request);
     }
 
@@ -30,7 +36,7 @@ public class ShowController {
     public com.paytm.seatreservation.dto.ReservationResponse reserveSeats(
         @PathVariable UUID id,
         @RequestHeader(value = "Authorization", required = false) String authHeader,
-        @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+        @RequestHeader(value = "Idempotency-Key") String idempotencyKey,
         @RequestBody com.paytm.seatreservation.dto.ReserveSeatsRequest request
     ) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -40,7 +46,7 @@ public class ShowController {
         if (userId.isEmpty()) {
             throw new com.paytm.seatreservation.exception.UnauthorizedException("Empty token provided");
         }
-        return reservationService.reserveSeats(id, userId, idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString(), request);
+        return reservationService.reserveSeats(id, userId, idempotencyKey, request);
     }
 
     @PostMapping("/reservations/{reservationId}/cancel")
