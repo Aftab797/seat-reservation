@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/shows")
 public class ShowController {
 
     private final ShowService showService;
@@ -20,13 +19,13 @@ public class ShowController {
         this.reservationService = reservationService;
     }
 
-    @PostMapping
+    @PostMapping("/shows")
     @ResponseStatus(HttpStatus.CREATED)
     public ShowResponse createShow(@RequestBody CreateShowRequest request) {
         return showService.createShow(request);
     }
 
-    @PostMapping("/{id}/reserve")
+    @PostMapping("/shows/{id}/reserve")
     @ResponseStatus(HttpStatus.CREATED)
     public com.paytm.seatreservation.dto.ReservationResponse reserveSeats(
         @PathVariable UUID id,
@@ -58,7 +57,7 @@ public class ShowController {
         }
         reservationService.cancelReservation(reservationId, userId);
     }
-    @GetMapping("/{id}")
+    @GetMapping("/shows/{id}")
     public ShowResponse getShow(@PathVariable UUID id) {
         return showService.getShow(id);
     }
